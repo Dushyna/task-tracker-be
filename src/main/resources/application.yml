@@ -31,7 +31,7 @@ confirmation:
     days: ${CONFIRMATION_EXPIRATION_DAYS}
 
 app:
-  base-url: ${BASE_URL}
+base-url: ${BASE_URL:http://localhost:5173}
 
 digitalocean:
   spaces:
