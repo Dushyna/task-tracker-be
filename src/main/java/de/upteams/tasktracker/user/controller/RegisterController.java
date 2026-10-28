@@ -9,13 +9,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.beans.factory.annotation.Value;
 import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class RegisterController implements RegisterControllerApi {
+
+    @Value("${base-url}")
+    private String baseUrl;
 
     private final UserRegisterServiceImpl service;
 
@@ -33,7 +36,7 @@ public class RegisterController implements RegisterControllerApi {
     @GetMapping("/confirm-redirect/{code}")
     public ResponseEntity<Void> confirmEmailRedirect(@PathVariable String code) {
         service.confirmRegistration(code);
-        URI redirectUri = URI.create("http://localhost:5173/#/login?confirmed=true");
+        URI redirectUri = URI.create(baseUrl + "/#/login?confirmed=true");
         return ResponseEntity.status(HttpStatus.FOUND).location(redirectUri).build();
 
 
