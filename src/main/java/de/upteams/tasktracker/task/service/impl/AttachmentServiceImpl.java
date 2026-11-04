@@ -63,15 +63,28 @@ public class AttachmentServiceImpl implements AttachmentService {
                 originalFilename = "unknown-file";
             }
             String safeFileName = Paths.get(originalFilename).getFileName().toString();
-            String fileName = UUID.randomUUID() + "_" + safeFileName;            Path path = Paths.get(uploadDir).toAbsolutePath().normalize();
+            String fileName = UUID.randomUUID() + "_" + safeFileName;
 
-            if (!Files.exists(path)) {
-                Files.createDirectories(path);
+            Path basePath = Paths.get(uploadDir).toAbsolutePath().normalize();
+
+            java.io.File attachmentsDir = basePath.toFile();
+            if (!attachmentsDir.exists()) {
+                attachmentsDir.mkdirs();
             }
 
-            Path targetLocation = path.resolve(taskId).resolve(fileName);
-            Files.createDirectories(targetLocation.getParent());
+            java.io.File taskDir = new java.io.File(attachmentsDir, taskId);
+            if (!taskDir.exists()) {
+                boolean created = taskDir.mkdirs();
+                if (created) {
+                    taskDir.setWritable(true, false);
+                    taskDir.setReadable(true, false);
+                }
+            }
+
+            // Шлях для збереження файлу
+            Path targetLocation = taskDir.toPath().resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            targetLocation.toFile().setReadable(true, false);
 
             Attachment attachment = new Attachment();
             attachment.setName(file.getOriginalFilename());
@@ -84,6 +97,7 @@ public class AttachmentServiceImpl implements AttachmentService {
             return mappingService.mapAttachmentToDto(saved);
 
         } catch (IOException ex) {
+            log.error("КРИТИЧНА ПОМИЛКА ЗБЕРЕЖЕННЯ ФАЙЛУ: ", ex);
             throw new RestApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not store file. Please try again!");
         }
     }
