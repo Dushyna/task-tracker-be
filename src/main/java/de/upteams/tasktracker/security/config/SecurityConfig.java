@@ -108,7 +108,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(List.of("http://localhost:5173","https://task-tracker-fe-five.vercel.app", "http://82.165.11.157","https://dushyna.site"));
+        cfg.setAllowedOrigins(List.of("http://localhost:5173","https://task-tracker-fe-five.vercel.app", "http://82.165.11.157","https://dushyna.site", "http://dushyna.site"));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
