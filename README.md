@@ -1,140 +1,126 @@
-# Описание проекта TaskTracker
+# TaskTracker — Backend
 
-## Глава 1. Текущее состояние
+![CI/CD](https://github.com)
 
-### 1. Безопасность и авторизация
+REST-API und Geschäftslogik für die Webanwendung **TaskTracker** ([https://dushyna.site](https://dushyna.site)).
 
-Для защиты доступа к API и ресурсам TaskTracker используется JWT (JSON Web Tokens) с разделением на два типа токенов:
+---
+
+## 🛠 Technologie-Stack
+
+* **Sprache & Framework:** Java 17, Spring Boot 3 (Spring Web, Spring Data JPA, Spring Security)
+* **Build-Tool:** Gradle
+* **Datenbank:** MySQL 8.0
+* **Authentifizierung:** JWT (JSON Web Tokens) über `HttpOnly`-Cookies
+* **Containerisierung & CI/CD:** Docker (Multi-Stage-Build mit Distroless Runtime), Docker Compose, GitHub Actions
+
+---
+
+## 🔐 Sicherheit und Authentifizierung
+
+Zur Absicherung der API und Ressourcen verwendet TaskTracker **JWT (JSON Web Tokens)** mit einer Trennung in zwei Token-Typen:
 
 * **Access Token (AT)**
-
-    * Краткоживущий токен (обычно 5–15 минут).
-    * Хранится в HTTP‑cookie с флагом `HttpOnly`.
-    * Используется для авторизации каждого запроса к защищённым маршрутам.
-    * Минимизирует риск компрометации: в случае перехвата срок действия ограничен.
+  * Kurzlebiger Token (Standard: 15 Minuten).
+  * Wird in einem HTTP-Cookie mit dem Flag `HttpOnly` gespeichert.
+  * Dient zur Autorisierung jeder Anfrage an geschützte Endpunkte und minimiert das Risiko bei einer Kompromittierung.
 
 * **Refresh Token (RT)**
+  * Langlebiger Token (Standard: 7 Tage / 10080 Minuten).
+  * Wird ebenfalls in einem `HttpOnly`-Cookie gespeichert.
+  * Ermöglicht das Erneuern des Access Tokens ohne erneute Eingabe der Zugangsdaten.
 
-    * Долгоживущий токен (обычно несколько дней или недель).
-    * Тоже хранится в HTTP‑cookie `HttpOnly`.
-    * Предназначен для получения нового Access Token без повторного ввода учётных данных.
-    * Позволяет поддерживать «сеанс» пользовател-й без постоянной аутентификации.
+### Ablauf der Authentifizierung
+1. Beim Login (`POST /api/v1/auth/login`) prüft der Server E-Mail und Passwort und setzt beide Tokens (AT + RT) als `HttpOnly`-Cookies.
+2. Der Browser sendet den Access Token bei jeder Anfrage an geschützte Routen automatisch mit.
+3. Nach Ablauf des Access Tokens ruft der Client `POST /api/v1/auth/refresh-token` auf, um mithilfe des Refresh Tokens einen neuen Access Token zu erhalten.
+4. Beim Logout (`POST /api/v1/auth/logout`) werden beide Cookies gelöscht und die Tokens invalidiert.
 
-**Механика работы**:
-
-1. При входе (`/api/v1/auth/login`) сервер проверяет логин и пароль и выдаёт пару токенов (AT + RT) в двух cookie.
-2. Браузер автоматически отправляет Access Token, хранящийся в HTTP‑cookie, при каждом запросе к защищённым маршрутам.
-3. По истечении срока действия AT клиент автоматически делает запрос `/api/v1/auth/refresh`, передавая RT, и получает новый AT.
-4. При выходе из системы (`/api/v1/auth/logout`) оба cookie очищаются.
-
-**Маршруты авторизации**:
-
-* `POST /api/v1/auth/login` — аутентификация по логину и паролю.
-* `POST /api/v1/auth/refresh-token` — обновление Access Token по Refresh Token.
-* `POST /api/v1/auth/logout` — выход и удаление токенов.
-
-**Роли пользователей**:
-
-* **ROLE\_ADMIN** — полные административные права: управление пользователями, проектами и настройками.
-* **ROLE\_USER** — базовый доступ: создание и редактирование собственных проектов.
+### Benutzerrollen
+* **`ROLE_ADMIN`** — Vollständige administrative Rechte: Verwaltung von Benutzern, Projekten und Systemeinstellungen.
+* **`ROLE_USER`** — Standardzugriff: Erstellen und Verwalten eigener Projekte und Aufgaben.
 
 ---
 
-### 1. Проекты
+## 📡 API-Endpunkte
 
-* **Создать проект**
-  `POST /api/v1/projects`
-  Доступно всем зарегистрированным (**ROLE\_USER**, **ROLE\_ADMIN**).
-* **Получить все проекты**
-  `GET  /api/v1/projects`
-  Возвращает список проектов, в которых пользователь участвует.
-* **Получить проект по ID**
-  `GET  /api/v1/projects/{id}`
-  Доступно участникам проекта.
-* **Удалить проект**
-  `DELETE /api/v1/projects/{id}`
-  Доступно владельцу проекта или **ROLE\_ADMIN**.
+### 1. Authentifizierung & Registrierung
+* `POST /api/v1/users/register` — Registrierung eines neuen Benutzers *(öffentlich)*.
+* `GET /api/v1/users/confirm/{code}` — Aktivierung des Benutzerkontos per Bestätigungscode *(öffentlich)*.
+* `POST /api/v1/auth/login` — Anmeldung mit E-Mail und Passwort (setzt JWT-Cookies).
+* `POST /api/v1/auth/refresh-token` — Erneuerung des Access Tokens über den Refresh Token.
+* `POST /api/v1/auth/logout` — Abmeldung und Löschen der Auth-Cookies.
 
-### 2. Задачи
+### 2. Projekte
+* `POST /api/v1/projects` — Neues Projekt erstellen (`ROLE_USER`, `ROLE_ADMIN`).
+* `GET /api/v1/projects` — Alle Projekte abrufen, an denen der Benutzer beteiligt ist.
+* `GET /api/v1/projects/{id}` — Projektdetails nach ID abrufen *(Projektmitglieder)*.
+* `DELETE /api/v1/projects/{id}` — Projekt löschen *(Projekteigentümer oder `ROLE_ADMIN`)*.
 
-* **Создать задачу**
-  `POST /api/v1/tasks`
-  Доступно участникам проекта.
-* **Получить задачу по ID**
-  `GET  /api/v1/tasks/{id}`
-  Доступно участникам проекта.
-* **Удалить задачу**
-  `DELETE /api/v1/tasks/{id}`
-  Доступно создателю задачи или владельцу проекта.
-* **Получить все задачи проекта**
-  `GET  /api/v1/tasks/project/{projectId}`
-  Доступно участникам проекта.
+### 3. Aufgaben (Tasks)
+* `POST /api/v1/tasks` — Neue Aufgabe erstellen *(Projektmitglieder)*.
+* `GET /api/v1/tasks/{id}` — Aufgabendetails nach ID abrufen *(Projektmitglieder)*.
+* `GET /api/v1/tasks/project/{projectId}` — Alle Aufgaben eines Projekts abrufen *(Projektmitglieder)*.
+* `DELETE /api/v1/tasks/{id}` — Aufgabe löschen *(Aufgabenersteller oder Projekteigentümer)*.
 
-### 3. Приглашения и участники (не реализованно)
+### 4. Benutzerverwaltung (`ROLE_ADMIN`)
+* `GET /api/v1/users/all` — Liste aller registrierten Benutzer abrufen *(nur `ROLE_ADMIN`)*.
 
-* **Приглашение пользователя**
-  `POST /api/v1/projects/{projectId}/invitations`
-  Доступно владельцу проекта.
-* **Получить список участников**
-  `GET  /api/v1/projects/{projectId}/collaborators`
-  Доступно участникам проекта.
-
-### 4. Пользователи (ROLE\_ADMIN)
-
-* **Получить всех пользователей**
-  `GET /api/v1/users/all`
-  Доступно только **ROLE\_ADMIN**.
-
-### 5. Аутентификация и регистрация
-
-* **Регистрация**
-  `POST /api/v1/users/register`
-  Открытый эндпоинт для создания нового пользователя.
-* **Подтверждение регистрации**
-  `GET  /api/v1/users/confirm/{code}`
-  Открытый эндпоинт для активации аккаунта по коду.
-* **Вход**
-  `POST /api/v1/auth/login`
-  Принимает e-mail и пароль, возвращает JWT в HTTP-only cookie.
-* **Обновление токена**
-  `POST /api/v1/auth/refresh-token`
-  Принимает refresh token, возвращает новый access token.
-* **Выход**
-  `POST /api/v1/auth/logout`
-  Инвалидирует токены и очищает cookie.
+### 5. Einladungen & Teammitglieder *(in Planung)*
+* `POST /api/v1/projects/{projectId}/invitations` — Benutzer zu einem Projekt einladen *(Projekteigentümer)*.
+* `GET /api/v1/projects/{projectId}/collaborators` — Liste der Projektmitglieder abrufen *(Projektmitglieder)*.
 
 ---
 
-## CI/CD
+## 🚀 Lokale Entwicklung
 
-![CI](https://github.com/<your-org>/<your-repo>/actions/workflows/gradle.yml/badge.svg)
+### Voraussetzungen
+* JDK 17+
+* Docker & Docker Compose
 
-Проект интегрирован с **GitHub Actions** для автоматической сборки, тестирования и статического анализа при каждом `push` в ветки `main`, `develop` и при открытии Pull Request.
-
-### Workflow файл
-
-Расположен по пути `.github/workflows/gradle.yml`. Триггерится на события:
-
-* `push` в ветки `main`, `develop`
-* `pull_request` к веткам `main`, `develop`
-
-#### Основные шаги
-
-1. **Checkout** — клонирование репозитория.
-2. **Настройка JDK 17**:
-
-   ```yaml
-   - name: Set up JDK
-     uses: actions/setup-java@v3
-     with:
-       distribution: 'temurin'
-       java-version: 17
-   ```
-3. **Кеширование зависимостей Gradle**.
-4. **Запуск MySQL** (для интеграционных тестов).
-5. **Сборка и тесты**:
-
+### Anwendung starten
+1. Repository klonen:
    ```bash
-   ./gradlew clean build --info
+   git clone https://github.com/Dushyna/task-tracker-be.git
+   cd task-tracker-be
    ```
+
+2. Umgebungsvariablen in einer `.env`-Datei im Verzeichnis `docker/` konfigurieren:
+   ```env
+   DB_PASSWORD=root
+   EMAIL_USERNAME=your-email@example.com
+   EMAIL_PASSWORD=your-email-password
+   JWT_AT_SECRET=your-access-token-secret
+   JWT_RT_SECRET=your-refresh-token-secret
+   BASE_URL=http://localhost:8080
+   ```
+
+3. Datenbank und Backend mit Docker Compose starten:
+   ```bash
+   docker compose -f docker/docker-compose.yml up -d --build
+   ```
+   Alternativ kann das Backend lokal über Gradle gestartet werden:
+   ```bash
+   ./gradlew bootRun
+   ```
+
 ---
+
+## 🔄 CI/CD & Deployment
+
+Das Projekt ist mit **GitHub Actions** (`.github/workflows/gradle.yml`) integriert. Die Pipeline wird bei jedem `push` und `pull_request` auf die Branches `main` und `develop` ausgelöst:
+
+1. **Continuous Integration (`build`)**
+  * Checkout des Repositories und Einrichtung von **JDK 17 (Temurin)** inklusive Gradle-Caching.
+  * Kompilierung und Ausführung der automatisierten Tests via `./gradlew build --no-daemon`.
+
+2. **Continuous Deployment (`deploy`)**
+  * Wird automatisch nach erfolgreichem Build bei einem `push` auf den Branch `develop` ausgeführt.
+  * Verbindet sich per SSH mit dem Produktionsserver (VPS), aktualisiert den Quellcode und baut den `backend`-Container über Docker Compose neu (`DOCKER_BUILDKIT=1 docker compose up -d --build --no-deps backend`).
+
+---
+
+## 🔗 Verwandte Repositories
+
+* **Frontend:** [Dushyna/task-tracker-fe](https://github.com)
+* **Live-Anwendung:** [https://dushyna.site](https://dushyna.site)
